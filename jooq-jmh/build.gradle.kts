@@ -1,0 +1,104 @@
+import kotlinx.benchmark.gradle.*
+
+
+plugins {
+    java
+    kotlin("jvm") version "2.0.0"
+    id("org.jetbrains.kotlin.plugin.allopen") version "2.0.20"
+    id("org.jetbrains.kotlinx.benchmark") version "0.4.13"
+    id("org.jooq.jooq-codegen-gradle") version "3.20.1"
+}
+
+allOpen {
+    annotation("org.openjdk.jmh.annotations.State")
+}
+
+group = "org.jooq"
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    jooqCodegen(platform("org.springframework.boot:spring-boot-dependencies:3.4.3"))
+    jooqCodegen("org.jooq:jooq-codegen")
+    jooqCodegen("org.postgresql:postgresql:42.7.5")
+    jooqCodegen("org.jooq:jooq-meta-extensions-hibernate:3.20.1")
+    implementation("org.jooq:jooq:3.20.2")
+    implementation("org.springframework.boot:spring-boot-starter-data-jpa:3.4.3")
+    implementation("org.jetbrains.kotlinx:kotlinx-benchmark-runtime:0.4.13")
+    implementation("org.postgresql:postgresql:42.7.5")
+    testImplementation("org.springframework.boot:spring-boot-starter-test:3.4.3")
+    testImplementation(kotlin("test"))
+}
+jooq {
+    configuration {
+        generator {
+            name = "org.jooq.codegen.KotlinGenerator"
+        }
+        jdbc{
+            driver = "org.postgresql.Driver"
+            url = "jdbc:postgresql://localhost:5432/postgres?currentSchema=jooq-jmh"
+            user = "postgres"
+            password = "root"
+        }
+        generator{
+            database{
+                name = "org.jooq.meta.postgres.PostgresDatabase"
+                properties {
+                    property {
+                        key = "packages"
+                        value = "jmh.entities"
+                    }
+                }
+                excludes = """
+                Job|Address|UserDetails|pagination\..*|information_schema\..*|pg_catalog\..*
+                """.trimMargin()
+            }
+            target {
+
+                packageName = "jmh.jooq.generated"
+
+                directory = "src/main/kotlin"
+            }
+
+
+        }
+    }
+}
+
+benchmark {
+    configurations {
+        named("main") {
+          /*  warmups = 3
+            iterations = 3
+            iterationTime = 1
+            iterationTimeUnit = "ms"
+            outputTimeUnit = "ms"
+            reportFormat = "csv"
+//            outputTimeUnit = "nanos"
+            mode = "avgt"
+            include("JooqBenchMark*")*/
+        }
+    }
+    targets {
+        register("main") {
+            this as JvmBenchmarkTarget
+            jmhVersion = "1.21"
+        }
+    }
+}
+
+java.sourceSets.getByName("main"){
+    java.srcDir("src/main/kotlin")
+}
+java.sourceSets.getByName("test"){
+    java.srcDir("src/test/kotlin")
+}
+
+tasks.test {
+    useJUnitPlatform()
+}
+kotlin {
+    jvmToolchain(21)
+}
